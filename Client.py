@@ -1,5 +1,8 @@
 # Import socket module
 import socket
+from PIL import Image, ImageFilter, ImageFile, ImageGrab
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def Main():
@@ -13,16 +16,28 @@ def Main():
 
     # connect to server on local computer
     s.connect((host, port))
-    # message you send to server
-    file = open(r"C:\Users\tec05\PycharmProjects\pythonProject4\chucknorris.jpg", "rb")
-    image_data = file.read(2048)
 
-    while image_data:
-        # message sent to server
-        s.send(image_data)
-        image_data = file.read(2048)
+    BUFFER_SIZE = 4096
 
-    file.close()
+    with open("chucknorris.jpg", "rb") as file:
+        file_data = file.read(BUFFER_SIZE)
+
+        while file_data:
+            s.send(file_data)
+            file_data = file.read(BUFFER_SIZE)
+
+    s.send(b"%IMAGE_COMPLETED%")  # b is bytes
+
+    with open('client_file_edited.jpg', "wb") as file:
+        recv_data = s.recv(BUFFER_SIZE)
+
+        while recv_data:
+            file.write(recv_data)
+            recv_data = s.recv(BUFFER_SIZE)
+
+            if recv_data == b"%IMAGE_COMPLETED%":
+                break
+
     # close the connection
     s.close()
 
