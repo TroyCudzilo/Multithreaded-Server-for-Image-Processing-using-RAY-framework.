@@ -1,7 +1,10 @@
 # import socket programming library
 import socket
 import threading
+import io
 from PIL import Image, ImageFilter
+
+import pathlib
 # import thread module
 from _thread import *
 
@@ -10,36 +13,35 @@ print_lock = threading.Lock()
 
 # thread function
 def threaded(c):
-    file = open('new_image.jpg', "wb")
-    image_chunk = c.recv(2048)
 
-    while image_chunk:
-        file.write(image_chunk)
-        image_chunk = c.recv(2048)
-        if not image_chunk:
+    BUFFER_SIZE = 4096
+
+    file_stream = io.BytesIO()
+    recv_data = c.recv(BUFFER_SIZE)
+
+    while recv_data:
+        file_stream.write(recv_data)
+        recv_data = c.recv(BUFFER_SIZE)
+        if recv_data == b"%IMAGE_COMPLETED%":
             break
 
-    with Image.open(file) as im:
-        im_blurred = im.filter(filter=ImageFilter.BLUR)
+    image = Image.open(file_stream)
+    image = image.filter(ImageFilter.GaussianBlur(radius=10))
 
+    image.save('server_file.jpg', format='JPEG')
 
+    with open('server_file.jpg', "rb") as file:
+        file_data = file.read(BUFFER_SIZE)
 
-        # if not image_chunk:
-        #      with Image.open(file) as im:
-        #       im_blurred = im.filter(filter=ImageFilter.BLUR)
-        # #     # lock released on exit
-        # #     print_lock.release()
-        # #     break
-        #
-        # # # reverse the given string from client
-        #
-        # # # send back reversed string to client
-    c.send(im_blurred)
+        while file_data:
+            c.send(file_data)
+            file_data = file.read(BUFFER_SIZE)
 
-    file.close()
-    # connection closed
+    #send flag
+    c.send(b'%IMAGE_COMPLETED%')
+
+    #close connection
     c.close()
-
 
 def Main():
     host = ""
@@ -67,7 +69,6 @@ def Main():
 
         # Start a new thread and return its identifier
         start_new_thread(threaded, (c,))
-    s.close()
 
 
 if __name__ == '__main__':
